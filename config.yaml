@@ -1,0 +1,72 @@
+agency:
+  name: "SEA Automation Agency"
+  target_markets:
+    - vietnam
+    - thailand
+    - philippines
+  primary_language: vietnamese
+  secondary_language: english
+
+niche:
+  primary: ecommerce_sellers
+  platforms:
+    - shopee
+    - tiktok_shop
+    - lazada
+  target_company_size: "1-50 employees"
+  target_revenue: "500M-10B VND annual"
+
+services:
+  - id: order_sync
+    name: "Multi-Platform Order Sync"
+    name_vi: "Đồng bộ đơn hàng đa sàn"
+    price_vnd: 15000000
+    price_usd: 600
+    delivery_days: 7
+  - id: inventory_alerts
+    name: "Inventory Alert System"
+    name_vi: "Hệ thống cảnh báo tồn kho"
+    price_vnd: 8000000
+    price_usd: 320
+    delivery_days: 5
+  - id: reporting_dashboard
+    name: "Automated Reporting Dashboard"
+    name_vi: "Dashboard báo cáo tự động"
+    price_vnd: 12000000
+    price_usd: 480
+    delivery_days: 7
+  - id: lead_capture
+    name: "Lead Capture + Auto Follow-up"
+    name_vi: "Thu thập khách hàng tiềm năng + Tự động theo dõi"
+    price_vnd: 10000000
+    price_usd: 400
+    delivery_days: 5
+  - id: full_automation
+    name: "Full Business Automation Package"
+    name_vi: "Gói tự động hóa toàn diện"
+    price_vnd: 45000000
+    price_usd: 1800
+    delivery_days: 21
+
+outreach:
+  sequence_days: [1, 4, 10]
+  follow_up_count: 3
+  sender_name: ""  # fill in your name
+  sender_email: ""  # fill in your Gmail address
+
+crm:
+  type: google_sheets
+  sheet_name: "SEA Agency CRM"
+  columns:
+    - Business Name
+    - Contact Name
+    - Email
+    - Phone
+    - Platform
+    - City
+    - Monthly Orders (est)
+    - Pain Point
+    - Status
+    - Last Contact
+    - Deal Value
+    - Notes

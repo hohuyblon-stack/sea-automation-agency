@@ -1,0 +1,26 @@
+# SEA Automation Agency — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Google APIs
+google-auth>=2.17.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.88.0
+
+# HTTP / scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Config / env
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+
+# Data
+# (no pandas needed — using csv + sqlite3 from stdlib)
+
+# Email / output
+markdown>=3.5.0        # for HTML proposal generation (optional fallback)
+
+# Dev / optional
+# playwright>=1.40.0   # uncomment if using browser automation for scraping

@@ -1,0 +1,55 @@
+{
+  "client": {
+    "name": "REPLACE_WITH_CLIENT_NAME",
+    "business_name": "REPLACE_WITH_BUSINESS_NAME",
+    "city": "Ho Chi Minh",
+    "zalo_webhook": "REPLACE_WITH_ZALO_WEBHOOK_URL"
+  },
+  "platforms": {
+    "shopee": {
+      "enabled": false,
+      "partner_id": "REPLACE_WITH_SHOPEE_PARTNER_ID",
+      "partner_key": "REPLACE_WITH_SHOPEE_PARTNER_KEY",
+      "shop_id": "REPLACE_WITH_SHOPEE_SHOP_ID",
+      "access_token": "REPLACE_WITH_SHOPEE_ACCESS_TOKEN",
+      "refresh_token": "REPLACE_WITH_SHOPEE_REFRESH_TOKEN"
+    },
+    "tiktok_shop": {
+      "enabled": false,
+      "app_key": "REPLACE_WITH_TIKTOK_APP_KEY",
+      "app_secret": "REPLACE_WITH_TIKTOK_APP_SECRET",
+      "access_token": "REPLACE_WITH_TIKTOK_ACCESS_TOKEN",
+      "shop_id": "REPLACE_WITH_TIKTOK_SHOP_ID"
+    },
+    "lazada": {
+      "enabled": false,
+      "app_key": "REPLACE_WITH_LAZADA_APP_KEY",
+      "app_secret": "REPLACE_WITH_LAZADA_APP_SECRET",
+      "access_token": "REPLACE_WITH_LAZADA_ACCESS_TOKEN",
+      "region": "VN"
+    }
+  },
+  "sync": {
+    "interval_minutes": 15,
+    "lookback_hours": 24,
+    "auto_confirm_orders": true,
+    "auto_update_inventory": true
+  },
+  "inventory": {
+    "low_stock_threshold": 10,
+    "critical_stock_threshold": 3,
+    "alert_on_zero": true
+  },
+  "reporting": {
+    "daily_report_time": "09:00",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "report_to_zalo": true,
+    "report_to_email": false,
+    "email_recipients": []
+  },
+  "storage": {
+    "orders_db": "data/orders.db",
+    "inventory_db": "data/inventory.db",
+    "logs_dir": "logs/"
+  }
+}

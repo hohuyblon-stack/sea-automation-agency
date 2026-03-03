@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyo
+venv/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables — never commit secrets
+.env
+credentials.json
+token.json
+*.p12
+*.pem
+service_account.json
+
+# Raw leads data — may contain PII
+leads/data/*.csv
+leads/data/*.json
+
+# Client private data
+clients/*/private/
+clients/*/config.json
+clients/*/credentials.json
+clients/*/token.json
+
+# Generated output
+generated/
+reports/output/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Node (if any frontend tooling added)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# WeasyPrint / PDF output
+*.pdf
