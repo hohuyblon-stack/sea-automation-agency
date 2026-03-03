@@ -363,8 +363,14 @@ def update_lead_status(sheets_service, spreadsheet_id: str, business_name: str, 
 def determine_next_email(crm_row: dict, sent_date_override: Optional[str] = None) -> Optional[int]:
     """
     Given a CRM outreach row, determine which email to send next.
-    Returns 1, 2, 3, or None (if sequence is complete).
+    Returns 1, 2, 3, or None (if sequence is complete or should stop).
     """
+    # Stop immediately if the lead has replied or booked a meeting
+    replied = crm_row.get("Reply Received", "No").strip().lower() == "yes"
+    meeting = crm_row.get("Meeting Booked", "No").strip().lower() == "yes"
+    if replied or meeting:
+        return None
+
     email_1_sent = crm_row.get("Email 1 Sent", "No").strip().lower() == "yes"
     email_2_sent = crm_row.get("Email 2 Sent", "No").strip().lower() == "yes"
     email_3_sent = crm_row.get("Email 3 Sent", "No").strip().lower() == "yes"

@@ -58,11 +58,10 @@ SELLER_KEYWORDS = [
 ]
 
 DISQUALIFY_PATTERNS = [
-    r"@gmail\.com$",           # generic Gmail with no business name
-    r"test",
-    r"example",
-    r"demo",
-    r"unknown",
+    r"^test",
+    r"^example",
+    r"^demo",
+    r"^unknown",
 ]
 
 

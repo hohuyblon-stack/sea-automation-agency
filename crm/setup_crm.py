@@ -23,7 +23,10 @@ from googleapiclient.errors import HttpError
 # Configuration
 # ---------------------------------------------------------------------------
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
 BASE_DIR = Path.home() / "sea-automation-agency"
 CREDENTIALS_PATH = BASE_DIR / "credentials.json"
 ENV_PATH = BASE_DIR / ".env"
@@ -323,6 +326,17 @@ def add_data_validation(service, spreadsheet_id):
         print("Data validation (dropdowns) added.")
 
 
+def share_spreadsheet(spreadsheet_id: str, email: str):
+    """Share the spreadsheet with a personal Google account so it's accessible."""
+    drive_service = build("drive", "v3", credentials=get_credentials())
+    drive_service.permissions().create(
+        fileId=spreadsheet_id,
+        body={"type": "user", "role": "writer", "emailAddress": email},
+        sendNotificationEmail=False,
+    ).execute()
+    print(f"Spreadsheet shared with: {email}")
+
+
 def save_env(spreadsheet_id):
     """Append or update SHEETS_CRM_ID in the .env file."""
     ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -354,6 +368,12 @@ def save_env(spreadsheet_id):
 def main():
     print("=== SEA Agency CRM Setup ===\n")
 
+    personal_email = os.environ.get("PERSONAL_GOOGLE_EMAIL", "").strip()
+    if not personal_email:
+        personal_email = input("Enter your personal Google email to share the CRM with: ").strip()
+    if not personal_email:
+        print("WARNING: No personal email provided — you may not be able to open the spreadsheet.")
+
     creds = get_credentials()
     service = build("sheets", "v4", credentials=creds)
 
@@ -366,12 +386,12 @@ def main():
     add_data_validation(service, spreadsheet_id)
     save_env(spreadsheet_id)
 
+    if personal_email:
+        print(f"Sharing with {personal_email}...")
+        share_spreadsheet(spreadsheet_id, personal_email)
+
     print("\n=== Setup Complete ===")
     print(f"CRM URL: {spreadsheet_url}")
-    print(
-        "\nNOTE: Share the spreadsheet with your service account email if you"
-        " haven't already, or make sure the service account has Editor access."
-    )
 
 
 if __name__ == "__main__":
