@@ -162,12 +162,33 @@ def md_to_html(markdown_text: str, title: str = "Proposal") -> str:
 </html>"""
 
 
+CASE_STUDY_SECTION_MD = """
+
+---
+
+## DỰ ÁN ĐÃ TRIỂN KHAI / Past Projects
+
+Mình đã triển khai các hệ thống tự động hóa cho doanh nghiệp Việt Nam. Xem chi tiết:
+
+- **Tự Động Hóa Báo Cáo Email** — Hệ thống báo cáo doanh thu tự động hàng ngày, tiết kiệm 45 phút/ngày.
+  [Xem case study](generated/case_studies/email_reporting.html)
+
+- **Bot Telegram Quản Lý Gara** — Check-in xe từ 5 phút xuống 30 giây, dữ liệu tập trung real-time.
+  [Xem case study](generated/case_studies/garage_telegram_bot.html)
+
+*We've deployed automation systems for Vietnamese businesses. See full case studies above.*
+
+---
+"""
+
+
 def generate_proposal(
     template_path: str,
     client_data: dict,
     output_dir: str,
     config: dict,
     env: dict,
+    include_case_studies: bool = False,
 ) -> tuple[str, str]:
     """
     Generate proposal files.
@@ -179,6 +200,31 @@ def generate_proposal(
         logger.error(f"Template not found: {template_path}")
         sys.exit(1)
     template_text = path.read_text(encoding="utf-8")
+
+    # Inject case studies section before the contact/footer section
+    if include_case_studies:
+        # Insert before the last "## 7." or "## THÔNG TIN LIÊN HỆ" section
+        contact_patterns = [
+            r"(## 7\. THÔNG TIN LIÊN HỆ)",
+            r"(## \d+\. THÔNG TIN LIÊN HỆ)",
+            r"(## THÔNG TIN LIÊN HỆ)",
+        ]
+        inserted = False
+        for pattern in contact_patterns:
+            if re.search(pattern, template_text):
+                template_text = re.sub(
+                    pattern,
+                    CASE_STUDY_SECTION_MD + r"\1",
+                    template_text,
+                    count=1,
+                )
+                inserted = True
+                logger.info("Case studies section inserted into proposal")
+                break
+        if not inserted:
+            # Fallback: append before the last horizontal rule
+            template_text += CASE_STUDY_SECTION_MD
+            logger.info("Case studies section appended to proposal")
 
     # Build variable dict
     outreach_cfg = config.get("outreach", {})
@@ -244,6 +290,11 @@ def main():
     parser.add_argument("--client-json", default="", help="Path to client data JSON file")
     parser.add_argument("--output-dir", default="generated", help="Output directory (default: generated/)")
     parser.add_argument("--open", action="store_true", help="Open HTML in browser after generation")
+    parser.add_argument(
+        "--case-studies",
+        action="store_true",
+        help="Include links to case study pages in the proposal",
+    )
     args = parser.parse_args()
 
     config = load_config()
@@ -272,6 +323,7 @@ def main():
         output_dir=args.output_dir,
         config=config,
         env=env,
+        include_case_studies=args.case_studies,
     )
 
     print(f"\nProposal generated:")

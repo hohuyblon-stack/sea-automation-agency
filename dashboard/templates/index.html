@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SEA Automation Agency Dashboard — Monitor leads, outreach, and pipeline">
+    <title>SEA Agency Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">
+                    <span class="logo-title">SEA Agency</span>
+                    <span class="logo-subtitle">Automation Dashboard</span>
+                </div>
+            </div>
+        </div>
+        <nav class="nav-tabs" id="navTabs">
+            <button class="nav-tab active" data-tab="dashboard">
+                <span class="tab-icon">📊</span> Dashboard
+            </button>
+            <button class="nav-tab" data-tab="leads">
+                <span class="tab-icon">👥</span> Leads
+            </button>
+            <button class="nav-tab" data-tab="outreach">
+                <span class="tab-icon">📧</span> Outreach
+            </button>
+            <button class="nav-tab" data-tab="actions">
+                <span class="tab-icon">🚀</span> Actions
+            </button>
+        </nav>
+        <div class="header-right">
+            <span class="live-dot"></span>
+            <span class="header-time" id="headerTime"></span>
+        </div>
+    </header>
+
+    <!-- Dashboard Tab -->
+    <main class="tab-content active" id="tab-dashboard">
+        <!-- KPI Cards -->
+        <div class="kpi-row" id="kpiCards">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Leads</div>
+                <div class="kpi-value" id="kpiTotal">—</div>
+                <div class="kpi-sub">in pipeline</div>
+            </div>
+            <div class="kpi-card accent">
+                <div class="kpi-label">Emails Sent</div>
+                <div class="kpi-value" id="kpiEmailsWeek">—</div>
+                <div class="kpi-sub">this week</div>
+            </div>
+            <div class="kpi-card success">
+                <div class="kpi-label">Replies</div>
+                <div class="kpi-value" id="kpiReplies">—</div>
+                <div class="kpi-sub" id="kpiReplyRate">—% rate</div>
+            </div>
+            <div class="kpi-card warm">
+                <div class="kpi-label">Meetings</div>
+                <div class="kpi-value" id="kpiMeetings">—</div>
+                <div class="kpi-sub" id="kpiMeetingRate">—% rate</div>
+            </div>
+            <div class="kpi-card gold">
+                <div class="kpi-label">Conversion</div>
+                <div class="kpi-value" id="kpiConversion">—%</div>
+                <div class="kpi-sub">closed won</div>
+            </div>
+        </div>
+
+        <!-- Pipeline Funnel -->
+        <section class="card">
+            <div class="card-header">
+                <h2>Pipeline Funnel</h2>
+                <button class="btn btn-ghost btn-sm" onclick="loadPipeline()">↻ Refresh</button>
+            </div>
+            <div class="funnel-container" id="funnelContainer">
+                <div class="funnel-loading">Loading pipeline…</div>
+            </div>
+        </section>
+
+        <!-- Services -->
+        <section class="card">
+            <div class="card-header">
+                <h2>Services & Pricing</h2>
+            </div>
+            <div class="services-grid" id="servicesGrid"></div>
+        </section>
+    </main>
+
+    <!-- Leads Tab -->
+    <main class="tab-content" id="tab-leads">
+        <section class="card">
+            <div class="card-header">
+                <h2>Qualified Leads</h2>
+                <div class="leads-controls">
+                    <input type="text" id="leadsSearch" class="input" placeholder="Search leads…" oninput="loadLeads()">
+                    <select id="leadsStatusFilter" class="input" onchange="loadLeads()">
+                        <option value="">All Statuses</option>
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="replied">Replied</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="proposal sent">Proposal Sent</option>
+                        <option value="closed won">Closed Won</option>
+                        <option value="closed lost">Closed Lost</option>
+                    </select>
+                    <select id="leadsPlatformFilter" class="input" onchange="loadLeads()">
+                        <option value="">All Platforms</option>
+                        <option value="shopee">Shopee</option>
+                        <option value="tiktok">TikTok Shop</option>
+                        <option value="lazada">Lazada</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="data-table" id="leadsTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="score" onclick="sortLeads('score')">Score ▼</th>
+                            <th class="sortable" data-sort="business_name" onclick="sortLeads('business_name')">Business Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th class="sortable" data-sort="platform" onclick="sortLeads('platform')">Platform</th>
+                            <th class="sortable" data-sort="city" onclick="sortLeads('city')">City</th>
+                            <th class="sortable" data-sort="status" onclick="sortLeads('status')">Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsBody"></tbody>
+                </table>
+            </div>
+            <div class="table-footer">
+                <span id="leadsCount">0 leads</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- Outreach Tab -->
+    <main class="tab-content" id="tab-outreach">
+        <section class="card">
+            <div class="card-header">
+                <h2>Outreach Monitor</h2>
+                <button class="btn btn-ghost btn-sm" onclick="loadOutreach()">↻ Refresh</button>
+            </div>
+            <div class="outreach-grid" id="outreachGrid">
+                <div class="funnel-loading">Loading outreach data…</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Actions Tab -->
+    <main class="tab-content" id="tab-actions">
+        <div class="actions-layout">
+            <!-- Action Buttons -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="runAction('scrape', this)">
+                        <span class="action-icon">🔍</span>
+                        <span class="action-label">Run Scraper</span>
+                        <span class="action-desc">Scrape Google Maps for new leads</span>
+                    </button>
+                    <button class="action-btn" onclick="runAction('qualify', this)">
+                        <span class="action-icon">⚡</span>
+                        <span class="action-label">Qualify Leads</span>
+                        <span class="action-desc">Score and filter raw leads</span>
+                    </button>
+                    <button class="action-btn" onclick="runAction('send-batch', this)">
+                        <span class="action-icon">📤</span>
+                        <span class="action-label">Send Batch (Dry Run)</span>
+                        <span class="action-desc">Preview next outreach batch</span>
+                    </button>
+                    <button class="action-btn danger" onclick="sendLive(this)">
+                        <span class="action-icon">🚀</span>
+                        <span class="action-label">Send Live</span>
+                        <span class="action-desc">Actually send emails</span>
+                    </button>
+                    <button class="action-btn" onclick="runAction('sync-crm', this)">
+                        <span class="action-icon">🔄</span>
+                        <span class="action-label">Sync to CRM</span>
+                        <span class="action-desc">Push leads to Google Sheets</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Action Output / Email Preview -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>Email Preview</h2>
+                </div>
+                <div class="preview-controls">
+                    <select id="previewLead" class="input" onchange="previewEmail()">
+                        <option value="">Select a lead…</option>
+                    </select>
+                    <select id="previewSeq" class="input" onchange="previewEmail()">
+                        <option value="1">Email 1 — Cold</option>
+                        <option value="2">Email 2 — Follow-up</option>
+                        <option value="3">Email 3 — Breakup</option>
+                    </select>
+                    <select id="previewLang" class="input" onchange="previewEmail()">
+                        <option value="vi">Tiếng Việt</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                <div class="email-preview" id="emailPreview">
+                    <div class="preview-placeholder">Select a lead to preview email</div>
+                </div>
+            </section>
+
+            <!-- Action Log -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>Action Log</h2>
+                    <button class="btn btn-ghost btn-sm" onclick="clearLog()">Clear</button>
+                </div>
+                <pre class="action-log" id="actionLog">Ready.\n</pre>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

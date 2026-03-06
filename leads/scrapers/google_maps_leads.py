@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from datetime import date
 from typing import List, Optional
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import urlencode
 
 import requests
 from bs4 import BeautifulSoup

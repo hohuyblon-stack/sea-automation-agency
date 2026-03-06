@@ -42,6 +42,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
 
+import markdown as md_lib
 import yaml
 from dotenv import dotenv_values
 from google.auth.transport.requests import Request
@@ -96,6 +97,41 @@ def load_env() -> dict:
         if key not in env:
             env[key] = os.environ.get(key, "")
     return env
+
+
+def validate_input_path(input_path: str, allowed_dir: str = "leads/data") -> Path:
+    """Validate that input path is within allowed directory.
+
+    Prevents path traversal attacks by ensuring the resolved path is within
+    the allowed directory.
+
+    Args:
+        input_path: User-provided file path
+        allowed_dir: Subdirectory path relative to BASE_DIR
+
+    Returns:
+        Resolved Path object if valid
+
+    Raises:
+        ValueError: If path is outside allowed directory
+        FileNotFoundError: If file does not exist
+    """
+    path = Path(input_path).resolve()
+    allowed = (BASE_DIR / allowed_dir).resolve()
+
+    # Ensure path is within allowed directory
+    try:
+        path.relative_to(allowed)
+    except ValueError:
+        raise ValueError(f"Path must be within {allowed_dir} directory, got: {input_path}")
+
+    if not path.exists():
+        raise FileNotFoundError(f"Input file not found: {path}")
+
+    if path.suffix != ".csv":
+        raise ValueError(f"Only CSV files allowed, got: {path.suffix}")
+
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -203,9 +239,9 @@ def build_template_vars(lead: dict, config: dict, env: dict) -> dict:
     outreach_cfg = config.get("outreach", {})
     return {
         "business_name": lead.get("business_name", ""),
-        "contact_name": lead.get("contact_name", "") or lead.get("business_name", ""),
+        "contact_name": lead.get("contact_name", "") or "Anh/Chị",
         "platform": lead.get("platform", "").replace("_", " ").title() or "Shopee/TikTok Shop",
-        "monthly_orders": lead.get("monthly_orders", "500") or "500",
+        "monthly_orders": lead.get("monthly_orders", "500+") or "500+",
         "sender_name": env.get("SENDER_NAME") or outreach_cfg.get("sender_name", ""),
         "sender_email": env.get("SENDER_EMAIL") or outreach_cfg.get("sender_email", ""),
         "sender_zalo": env.get("SENDER_ZALO", ""),
@@ -227,9 +263,9 @@ def create_message(to: str, subject: str, body: str, sender: str) -> dict:
     text_part = MIMEText(body, "plain", "utf-8")
     message.attach(text_part)
 
-    # Simple HTML version (preserve line breaks)
-    html_body = "<br>".join(body.split("\n"))
-    html_part = MIMEText(f"<html><body>{html_body}</body></html>", "html", "utf-8")
+    # HTML version with markdown rendering
+    html_body = md_lib.markdown(body, extensions=["nl2br"])
+    html_part = MIMEText(f"<html><body style='font-family:sans-serif;font-size:15px;line-height:1.6;max-width:600px;margin:auto;padding:20px;color:#222;'>{html_body}</body></html>", "html", "utf-8")
     message.attach(html_part)
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -360,7 +396,7 @@ def update_lead_status(sheets_service, spreadsheet_id: str, business_name: str, 
 # Sequence logic
 # ---------------------------------------------------------------------------
 
-def determine_next_email(crm_row: dict, sent_date_override: Optional[str] = None) -> Optional[int]:
+def determine_next_email(crm_row: dict) -> Optional[int]:
     """
     Given a CRM outreach row, determine which email to send next.
     Returns 1, 2, 3, or None (if sequence is complete or should stop).
@@ -525,14 +561,15 @@ def main():
             "monthly_orders": "500",
         }]
     elif args.input:
-        path = Path(args.input)
-        if not path.exists():
-            logger.error(f"Input file not found: {args.input}")
+        try:
+            path = validate_input_path(args.input)
+            with open(path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                leads = list(reader)
+            logger.info(f"Loaded {len(leads)} leads from {path}")
+        except (ValueError, FileNotFoundError) as e:
+            logger.error(str(e))
             sys.exit(1)
-        with open(path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            leads = list(reader)
-        logger.info(f"Loaded {len(leads)} leads from {args.input}")
     else:
         parser.error("Provide --input or --to")
 

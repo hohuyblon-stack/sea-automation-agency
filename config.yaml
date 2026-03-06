@@ -51,8 +51,10 @@ services:
 outreach:
   sequence_days: [1, 4, 10]
   follow_up_count: 3
-  sender_name: ""  # fill in your name
-  sender_email: ""  # fill in your Gmail address
+  sender_name: ""
+  sender_email: ""
+  # IMPORTANT: Set sender_name and sender_email in .env, not here
+  # This prevents sensitive PII from being committed to git
 
 crm:
   type: google_sheets

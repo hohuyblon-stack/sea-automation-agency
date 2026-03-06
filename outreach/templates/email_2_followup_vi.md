@@ -2,24 +2,22 @@
 sequence: 2
 day: 4
 language: vi
-subject: "Re: {{business_name}} – tự động hóa đơn hàng đa sàn"
+subject: "{{business_name}} – mình gửi thêm chi tiết"
 ---
 
 Chào {{contact_name}},
 
-Mình gửi lại vì email trước có thể đã bị lọc vào spam.
+Mình nhắn lại nhanh — không biết bạn có thấy email trước của mình không.
 
-Để cụ thể hơn: với shop có ~{{monthly_orders}} đơn/tháng trên {{platform}}, hệ thống của mình có thể:
+Để bạn dễ hình dung, mình chia sẻ cụ thể hơn cho shop ~{{monthly_orders}} đơn/tháng trên {{platform}}:
 
-✅ **Tiết kiệm ~90 giờ/tháng** so với xử lý thủ công
-✅ **Giảm 100% lỗi nhập liệu** (xác nhận đơn, cập nhật kho, in vận đơn)
-✅ **Cảnh báo tức thì** khi hàng sắp hết (qua Zalo)
+- **Giảm ~3-4 tiếng/ngày** xử lý đơn thủ công
+- **Giảm đáng kể lỗi nhập liệu** (xác nhận đơn, cập nhật kho, in vận đơn tự động)
+- **Cảnh báo qua Zalo** khi hàng sắp hết — không bị oversell
 
-Chi phí thiết lập: **15.000.000 VND**, thời gian: **7 ngày**.
+Chi phí thiết lập: **15.000.000 VND**, triển khai trong **7 ngày**. Nếu sau 30 ngày không thấy hiệu quả rõ ràng, mình hoàn tiền — không hỏi lý do.
 
-Nếu mình tính sai thì bạn không phải trả gì – cam kết hoàn tiền 100% trong 30 ngày đầu.
-
-Bạn có 10 phút để nói chuyện qua Zalo tuần này không?
+Bạn có tiện Zalo call 10 phút tuần này không? Mình muốn hiểu thêm quy trình bên bạn trước khi tư vấn gì thêm.
 
 {{sender_name}}
 Zalo: {{sender_zalo}}

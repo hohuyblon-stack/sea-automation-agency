@@ -2,20 +2,16 @@
 sequence: 3
 day: 10
 language: en
-subject: "Last note – {{business_name}}"
+subject: "{{business_name}} – closing the loop"
 ---
 
 Hi {{contact_name}},
 
-This is my last email.
+I know you're busy, so I won't take up more of your inbox.
 
-I know you're busy, and if the timing isn't right, that's completely fine. But I want to leave you with one question:
+Just wanted to say: if {{business_name}} ever needs help with order automation, or you just want a second opinion on your operations workflow — feel free to reach out anytime.
 
-**If you could get back 3 hours every day from manual order processing — what would you do with that time?**
-
-When you're ready, just message me on Zalo: {{sender_zalo}}
-
-Wishing {{business_name}} continued growth.
+Wishing you continued growth.
 
 {{sender_name}}
 {{sender_email}}

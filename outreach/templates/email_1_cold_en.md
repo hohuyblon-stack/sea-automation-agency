@@ -2,23 +2,18 @@
 sequence: 1
 day: 1
 language: en
-subject: "{{business_name}} – automate your multi-platform orders in 7 days"
+subject: "Quick question about order processing at {{business_name}}"
 ---
 
 Hi {{contact_name}},
 
-My name is {{sender_name}}. I help Shopee, TikTok Shop, and Lazada sellers automate their order management to save 3–5 hours every day.
+I'm {{sender_name}}. I build order automation systems for sellers on Shopee, TikTok Shop, and Lazada.
 
-I noticed {{business_name}} is selling on {{platform}}. As your order volume grows, manual processing leads to errors, delays, and seller penalties.
+I came across {{business_name}} on {{platform}} and had a quick question: are you currently processing orders and updating inventory manually, or do you already have a system in place?
 
-**Here's what I can set up for {{business_name}}:**
-- Auto-sync 100% of {{platform}} orders into one dashboard
-- Real-time inventory updates to prevent overselling
-- Daily revenue report sent to your phone at 9am
+Asking because I just finished a project for an auto workshop in Hanoi — they cut about 3-4 hours/day off admin work with automated order sync, Zalo stock alerts, and daily revenue reports delivered every morning.
 
-I've deployed this for similar shops — processing time drops from 4 hours/day to under 20 minutes.
-
-Would you be open to a quick 5-minute demo to see it in action?
+If that sounds relevant, I'm happy to share the details of that project.
 
 Best,
 {{sender_name}}
