@@ -52,12 +52,6 @@ CONFIG_PATH = BASE_DIR / "config.yaml"
 TEMPLATES_DIR = BASE_DIR / "outreach" / "templates"
 STATE_PATH = BASE_DIR / "outreach" / ".zalo_sequence_state.json"
 
-# Sequence: (message_number, days_after_previous)
-SEQUENCE = [
-    (1, 0),
-    (2, 4),
-    (3, 10),
-]
 
 
 # ---------------------------------------------------------------------------

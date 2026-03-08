@@ -157,11 +157,6 @@ def update_lead_status_in_csv(leads_dir: Path, email: str, new_status: str):
 # Gmail polling
 # ---------------------------------------------------------------------------
 
-def get_sender_email(gmail_service) -> str:
-    """Get the authenticated user's email address."""
-    profile = gmail_service.users().getProfile(userId="me").execute()
-    return profile.get("emailAddress", "")
-
 
 def extract_sender_email(headers: list) -> str:
     """Extract the From email address from message headers."""

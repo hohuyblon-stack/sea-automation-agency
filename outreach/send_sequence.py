@@ -79,14 +79,6 @@ GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
-SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-# Sequence: (email_number, template_prefix, days_from_start)
-SEQUENCE = [
-    (1, "email_1_cold", 0),
-    (2, "email_2_followup", 4),
-    (3, "email_3_breakup", 10),
-]
 
 
 # ---------------------------------------------------------------------------
