@@ -45,7 +45,7 @@ from typing import Optional
 import markdown as md_lib
 import yaml
 from dotenv import dotenv_values
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request, AuthorizedSession
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -64,6 +64,16 @@ CONFIG_PATH = BASE_DIR / "config.yaml"
 CREDENTIALS_PATH = BASE_DIR / "credentials.json"
 TOKEN_PATH = BASE_DIR / "token.json"
 TEMPLATES_DIR = BASE_DIR / "outreach" / "templates"
+
+# Workaround: google-api-python-client >=2.x escapes '!' as '\!' in URIs,
+# breaking Sheets range queries like 'Sheet!A1:B2'. Patch it out.
+import googleapiclient.http as _ghttp
+_orig_execute = _ghttp.HttpRequest.execute
+def _patched_execute(self, *a, **kw):
+    if self.uri and '%5C%21' in self.uri:
+        self.uri = self.uri.replace('%5C%21', '%21')
+    return _orig_execute(self, *a, **kw)
+_ghttp.HttpRequest.execute = _patched_execute
 
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
@@ -141,7 +151,7 @@ def validate_input_path(input_path: str, allowed_dir: str = "leads/data") -> Pat
 def get_gmail_service():
     creds = None
     if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), GMAIL_SCOPES)
+        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH))
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -162,21 +172,49 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def get_sheets_service():
-    from google.oauth2 import service_account
-    sa_path = BASE_DIR / "service_account.json"
-    if sa_path.exists():
-        creds = service_account.Credentials.from_service_account_file(
-            str(sa_path), scopes=SHEETS_SCOPES
-        )
-        return build("sheets", "v4", credentials=creds)
-    # Fall back to OAuth token
-    creds = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SHEETS_SCOPES + GMAIL_SCOPES)
-    if creds:
-        return build("sheets", "v4", credentials=creds)
-    return None
+def get_sheets_session() -> Optional[AuthorizedSession]:
+    """Return an AuthorizedSession for Sheets API using OAuth token."""
+    if not TOKEN_PATH.exists():
+        return None
+    creds = Credentials.from_authorized_user_file(str(TOKEN_PATH))
+    if not creds.valid:
+        creds.refresh(Request())
+    return AuthorizedSession(creds)
+
+
+SHEETS_BASE = "https://sheets.googleapis.com/v4/spreadsheets"
+
+
+class SheetsError(Exception):
+    pass
+
+
+def _sheets_get(session: AuthorizedSession, spreadsheet_id: str, range_: str) -> list:
+    """GET a range from Sheets. Returns rows list or []."""
+    from urllib.parse import quote
+    url = f"{SHEETS_BASE}/{spreadsheet_id}/values/{quote(range_, safe='')}"
+    r = session.get(url)
+    if r.status_code != 200:
+        raise SheetsError(f"{r.status_code} {r.text[:200]}")
+    return r.json().get("values", [])
+
+
+def _sheets_batch_update(session: AuthorizedSession, spreadsheet_id: str, data: list):
+    """Batch update ranges in Sheets."""
+    url = f"{SHEETS_BASE}/{spreadsheet_id}/values:batchUpdate"
+    body = {"valueInputOption": "USER_ENTERED", "data": data}
+    r = session.post(url, json=body)
+    if r.status_code != 200:
+        raise SheetsError(f"{r.status_code} {r.text[:200]}")
+
+
+def _sheets_update(session: AuthorizedSession, spreadsheet_id: str, range_: str, values: list):
+    """Update a single range in Sheets."""
+    from urllib.parse import quote
+    url = f"{SHEETS_BASE}/{spreadsheet_id}/values/{quote(range_, safe='!:')}?valueInputOption=USER_ENTERED"
+    r = session.put(url, json={"values": values})
+    if r.status_code != 200:
+        raise SheetsError(f"{r.status_code} {r.text[:200]}")
 
 
 # ---------------------------------------------------------------------------
@@ -296,16 +334,7 @@ def get_outreach_status(sheets_service, spreadsheet_id: str, business_name: str)
         return {}
 
     try:
-        result = (
-            sheets_service.spreadsheets()
-            .values()
-            .get(
-                spreadsheetId=spreadsheet_id,
-                range="'Outreach Tracker'!A:K",
-            )
-            .execute()
-        )
-        rows = result.get("values", [])
+        rows = _sheets_get(sheets_service, spreadsheet_id, "Outreach Tracker!A:K")
         if len(rows) < 2:
             return {}
 
@@ -314,7 +343,7 @@ def get_outreach_status(sheets_service, spreadsheet_id: str, business_name: str)
             row_dict = dict(zip(headers, row + [""] * (len(headers) - len(row))))
             if row_dict.get("Business Name", "").strip().lower() == business_name.strip().lower():
                 return row_dict
-    except HttpError as e:
+    except SheetsError as e:
         logger.warning(f"CRM lookup failed: {e}")
 
     return {}
@@ -339,30 +368,17 @@ def update_crm_outreach(
     sent_col, date_col = col_map.get(sequence_num, ("B", "C"))
 
     try:
-        # Find the row
-        result = (
-            sheets_service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range="'Outreach Tracker'!A:A")
-            .execute()
-        )
-        names = [r[0] if r else "" for r in result.get("values", [])]
+        names = [r[0] if r else "" for r in _sheets_get(sheets_service, spreadsheet_id, "Outreach Tracker!A:A")]
         for i, name in enumerate(names):
             if name.strip().lower() == business_name.strip().lower():
                 row_num = i + 1
-                sheets_service.spreadsheets().values().batchUpdate(
-                    spreadsheetId=spreadsheet_id,
-                    body={
-                        "valueInputOption": "USER_ENTERED",
-                        "data": [
-                            {"range": f"'Outreach Tracker'!{sent_col}{row_num}", "values": [["Yes"]]},
-                            {"range": f"'Outreach Tracker'!{date_col}{row_num}", "values": [[sent_date]]},
-                        ],
-                    },
-                ).execute()
+                _sheets_batch_update(sheets_service, spreadsheet_id, [
+                    {"range": f"Outreach Tracker!{sent_col}{row_num}", "values": [["Yes"]]},
+                    {"range": f"Outreach Tracker!{date_col}{row_num}", "values": [[sent_date]]},
+                ])
                 logger.debug(f"CRM updated: {business_name} email {sequence_num}")
                 return
-    except HttpError as e:
+    except SheetsError as e:
         logger.warning(f"CRM update failed: {e}")
 
 
@@ -371,24 +387,13 @@ def update_lead_status(sheets_service, spreadsheet_id: str, business_name: str, 
     if not sheets_service or not spreadsheet_id:
         return
     try:
-        result = (
-            sheets_service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range="'Leads'!A:A")
-            .execute()
-        )
-        names = [r[0] if r else "" for r in result.get("values", [])]
+        names = [r[0] if r else "" for r in _sheets_get(sheets_service, spreadsheet_id, "Leads!A:A")]
         for i, name in enumerate(names):
             if name.strip().lower() == business_name.strip().lower():
                 row_num = i + 1
-                sheets_service.spreadsheets().values().update(
-                    spreadsheetId=spreadsheet_id,
-                    range=f"'Leads'!J{row_num}",
-                    valueInputOption="USER_ENTERED",
-                    body={"values": [[status]]},
-                ).execute()
+                _sheets_update(sheets_service, spreadsheet_id, f"Leads!J{row_num}", [[status]])
                 return
-    except HttpError as e:
+    except SheetsError as e:
         logger.warning(f"Lead status update failed: {e}")
 
 
@@ -548,7 +553,7 @@ def main():
     sheets_service = None
     if not args.dry_run:
         gmail_service = get_gmail_service()
-        sheets_service = get_sheets_service()
+        sheets_service = get_sheets_session()
 
     # Build leads list
     leads = []
