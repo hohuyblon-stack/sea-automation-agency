@@ -8,14 +8,16 @@ This directory contains all lead generation scripts and raw lead data for the SE
 
 ```
 leads/
-├── README.md                   # This file
-├── qualify_leads.py            # Scores and filters raw leads
-├── data/                       # CSV files (gitignored — may contain PII)
-│   ├── raw/                    # Raw output from scrapers
-│   └── qualified_leads.csv     # Scored + filtered leads ready for outreach
+├── README.md                       # This file
+├── qualify_leads.py                # Scores and filters raw leads
+├── data/                           # CSV files (gitignored — may contain PII)
+│   ├── raw/                        # Raw output from scrapers
+│   └── qualified_leads.csv         # Scored + filtered leads ready for outreach
 └── scrapers/
-    ├── google_maps_leads.py    # Scrapes Google Maps business listings
-    └── facebook_group_leads.py # Extracts leads from Facebook group posts
+    ├── google_maps_leads.py        # Scrapes Google Maps business listings
+    ├── facebook_group_leads.py     # Extracts leads from Facebook group posts
+    ├── shopee_category_leads.py    # Scrapes Shopee sellers via Apify API
+    └── hunter_enrichment.py        # Enriches leads with emails via Hunter.io
 ```
 
 ---
@@ -37,7 +39,7 @@ All lead CSV files use the following column structure:
 | `city` | City/province | Ho Chi Minh |
 | `address` | Full address | 123 Nguyen Trai, Q1, HCM |
 | `category` | Business category | shop quan ao |
-| `source` | Where lead was found | google_maps |
+| `source` | Where lead was found | google_maps, shopee_category, facebook_group |
 | `score` | Qualification score 1–10 | 7 |
 | `status` | Pipeline status | new / contacted / replied / proposed / closed |
 | `notes` | Any additional notes | Sells on Shopee and TikTok |
@@ -101,10 +103,26 @@ python leads/scrapers/google_maps_leads.py \
   --city "Ho Chi Minh" \
   --count 20
 
+# Shopee Category (via Apify — requires APIFY_API_TOKEN in .env)
+python leads/scrapers/shopee_category_leads.py \
+  --category "thoi trang nu" \
+  --city "Ho Chi Minh" \
+  --count 30
+
 # Facebook Groups (requires manual setup — see script docstring)
 python leads/scrapers/facebook_group_leads.py \
   --group-url "https://facebook.com/groups/123456" \
   --count 50
+
+# Enrich leads with emails (requires HUNTER_API_KEY in .env)
+python leads/scrapers/hunter_enrichment.py \
+  --input leads/data/shopee_ho_chi_minh_thoi_trang_2026-03-06.csv \
+  --output leads/data/enriched_leads.csv
+
+# Dry-run email enrichment (preview without API calls)
+python leads/scrapers/hunter_enrichment.py \
+  --input leads/data/leads.csv \
+  --dry-run
 
 # Qualify leads
 python leads/qualify_leads.py \

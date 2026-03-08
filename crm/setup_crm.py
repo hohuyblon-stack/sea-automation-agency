@@ -16,6 +16,9 @@ import json
 from pathlib import Path
 
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -28,7 +31,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 BASE_DIR = Path.home() / "sea-automation-agency"
-CREDENTIALS_PATH = BASE_DIR / "credentials.json"
+CREDENTIALS_PATH = BASE_DIR / "service_account.json"
 ENV_PATH = BASE_DIR / ".env"
 SPREADSHEET_TITLE = "SEA Agency CRM"
 
@@ -143,25 +146,28 @@ HEADER_COLORS = {
 # ---------------------------------------------------------------------------
 
 def get_credentials():
-    """Load service account credentials from credentials.json."""
-    paths_to_try = [
-        CREDENTIALS_PATH,
-        Path("credentials.json"),
-        Path(__file__).parent / "credentials.json",
-    ]
-    for path in paths_to_try:
-        if path.exists():
-            print(f"Loading credentials from: {path}")
-            return service_account.Credentials.from_service_account_file(
-                str(path), scopes=SCOPES
-            )
-    print(
-        "ERROR: credentials.json not found.\n"
-        "Place your Google service account JSON at:\n"
-        f"  {CREDENTIALS_PATH}\n"
-        "See README.md for setup instructions."
-    )
-    sys.exit(1)
+    """Load OAuth2 user credentials (with interactive consent on first run)."""
+    token_path = BASE_DIR / "token.json"
+    oauth_path = BASE_DIR / "credentials.json"
+
+    creds = None
+    if token_path.exists():
+        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            if not oauth_path.exists():
+                print(f"ERROR: credentials.json not found at {oauth_path}")
+                sys.exit(1)
+            flow = InstalledAppFlow.from_client_secrets_file(str(oauth_path), SCOPES)
+            creds = flow.run_local_server(port=0, open_browser=True)
+        with open(token_path, "w") as f:
+            f.write(creds.to_json())
+        print(f"Token saved to {token_path}")
+
+    return creds
 
 
 def col_letter(index):

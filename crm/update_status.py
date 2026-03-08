@@ -42,7 +42,6 @@ VALID_STATUSES = [
 ]
 
 # Column indices (0-based) in the Leads sheet
-COL_BUSINESS_NAME = 0
 COL_STATUS = 9
 COL_LAST_CONTACT_DATE = 10
 COL_NOTES = 12

@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from datetime import date
 from typing import List, Optional
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import urlencode
 
 import requests
 from bs4 import BeautifulSoup
@@ -51,12 +51,6 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
 ]
 
-ECOMMERCE_KEYWORDS = [
-    "shop", "store", "cửa hàng", "thời trang", "mỹ phẩm", "quần áo",
-    "giày dép", "túi xách", "điện tử", "điện thoại", "đồng hồ",
-    "phụ kiện", "mẹ bé", "đồ chơi", "gia dụng", "nội thất",
-    "shopee", "tiktok", "lazada", "sendo", "online", "order",
-]
 
 PLATFORM_PATTERNS = {
     "shopee": [r"shopee\.vn/", r"shopee", r"shop\.ee"],
@@ -88,7 +82,6 @@ class Lead:
 class LeadScraper:
     """Scrapes business leads from Google Maps search results."""
 
-    BASE_URL = "https://www.google.com/maps/search/"
     SEARCH_URL = "https://www.google.com/search"
 
     def __init__(self, category: str, city: str, count: int = 20):

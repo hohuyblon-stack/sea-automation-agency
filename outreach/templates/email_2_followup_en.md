@@ -2,24 +2,22 @@
 sequence: 2
 day: 4
 language: en
-subject: "Re: {{business_name}} – order automation follow-up"
+subject: "{{business_name}} – sharing more details"
 ---
 
 Hi {{contact_name}},
 
-Following up in case my last email got buried.
+Quick follow-up — not sure if my last email came through.
 
-To be specific about what this means for {{business_name}} with ~{{monthly_orders}} orders/month on {{platform}}:
+To give you a clearer picture for {{business_name}} with ~{{monthly_orders}} orders/month on {{platform}}:
 
-✅ **Save ~90 hours/month** compared to manual processing
-✅ **Zero data entry errors** on order confirmation, stock updates, and shipping labels
-✅ **Instant Zalo alerts** when stock runs low
+- **Save ~3-4 hours/day** on manual order processing
+- **Significantly fewer data entry errors** on order confirmation, stock updates, and shipping labels
+- **Zalo alerts** when stock runs low — no more overselling
 
-Setup fee: **$600 USD**, delivery: **7 days**.
+Setup fee: **$600 USD**, delivery: **7 days**. If it doesn't save you meaningful time in the first 30 days, I'll refund you in full — no questions asked.
 
-If the system doesn't save you at least 3 hours per day in the first month, I'll refund you in full — no questions asked.
-
-Do you have 10 minutes to chat this week?
+Do you have 10 minutes for a quick call this week? I'd like to understand your current workflow before suggesting anything specific.
 
 Best,
 {{sender_name}}

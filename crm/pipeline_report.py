@@ -31,9 +31,7 @@ CREDENTIALS_PATH = BASE_DIR / "credentials.json"
 ENV_PATH = BASE_DIR / ".env"
 
 # Column indices (0-based) ---- Leads sheet
-L_BUSINESS_NAME = 0
 L_STATUS = 9
-L_LAST_CONTACT_DATE = 10
 
 # Column indices (0-based) ---- Outreach Tracker sheet
 OT_BUSINESS_NAME = 0
@@ -42,7 +40,6 @@ OT_EMAIL1_DATE = 2
 OT_EMAIL2_SENT = 3
 OT_EMAIL2_DATE = 4
 OT_EMAIL3_SENT = 5
-OT_EMAIL3_DATE = 6
 OT_REPLY_RECEIVED = 7
 
 # Column indices (0-based) ---- Proposals sheet
@@ -225,7 +222,6 @@ def build_followups_section(outreach_rows):
         email1_sent = safe_get(row, OT_EMAIL1_SENT, "No").strip().lower()
         email1_date_str = safe_get(row, OT_EMAIL1_DATE, "").strip()
         email2_sent = safe_get(row, OT_EMAIL2_SENT, "No").strip().lower()
-        email2_date_str = safe_get(row, OT_EMAIL2_DATE, "").strip()
         email3_sent = safe_get(row, OT_EMAIL3_SENT, "No").strip().lower()
 
         # Check if Email 2 is due

@@ -42,9 +42,10 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
 
+import markdown as md_lib
 import yaml
 from dotenv import dotenv_values
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request, AuthorizedSession
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -64,17 +65,19 @@ CREDENTIALS_PATH = BASE_DIR / "credentials.json"
 TOKEN_PATH = BASE_DIR / "token.json"
 TEMPLATES_DIR = BASE_DIR / "outreach" / "templates"
 
+# Workaround: google-api-python-client >=2.x escapes '!' as '\!' in URIs,
+# breaking Sheets range queries like 'Sheet!A1:B2'. Patch it out.
+import googleapiclient.http as _ghttp
+_orig_execute = _ghttp.HttpRequest.execute
+def _patched_execute(self, *a, **kw):
+    if self.uri and '%5C%21' in self.uri:
+        self.uri = self.uri.replace('%5C%21', '%21')
+    return _orig_execute(self, *a, **kw)
+_ghttp.HttpRequest.execute = _patched_execute
+
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
-]
-SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-# Sequence: (email_number, template_prefix, days_from_start)
-SEQUENCE = [
-    (1, "email_1_cold", 0),
-    (2, "email_2_followup", 4),
-    (3, "email_3_breakup", 10),
 ]
 
 
@@ -98,6 +101,41 @@ def load_env() -> dict:
     return env
 
 
+def validate_input_path(input_path: str, allowed_dir: str = "leads/data") -> Path:
+    """Validate that input path is within allowed directory.
+
+    Prevents path traversal attacks by ensuring the resolved path is within
+    the allowed directory.
+
+    Args:
+        input_path: User-provided file path
+        allowed_dir: Subdirectory path relative to BASE_DIR
+
+    Returns:
+        Resolved Path object if valid
+
+    Raises:
+        ValueError: If path is outside allowed directory
+        FileNotFoundError: If file does not exist
+    """
+    path = Path(input_path).resolve()
+    allowed = (BASE_DIR / allowed_dir).resolve()
+
+    # Ensure path is within allowed directory
+    try:
+        path.relative_to(allowed)
+    except ValueError:
+        raise ValueError(f"Path must be within {allowed_dir} directory, got: {input_path}")
+
+    if not path.exists():
+        raise FileNotFoundError(f"Input file not found: {path}")
+
+    if path.suffix != ".csv":
+        raise ValueError(f"Only CSV files allowed, got: {path.suffix}")
+
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Gmail auth
 # ---------------------------------------------------------------------------
@@ -105,7 +143,7 @@ def load_env() -> dict:
 def get_gmail_service():
     creds = None
     if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), GMAIL_SCOPES)
+        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH))
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -126,21 +164,49 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def get_sheets_service():
-    from google.oauth2 import service_account
-    sa_path = BASE_DIR / "service_account.json"
-    if sa_path.exists():
-        creds = service_account.Credentials.from_service_account_file(
-            str(sa_path), scopes=SHEETS_SCOPES
-        )
-        return build("sheets", "v4", credentials=creds)
-    # Fall back to OAuth token
-    creds = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SHEETS_SCOPES + GMAIL_SCOPES)
-    if creds:
-        return build("sheets", "v4", credentials=creds)
-    return None
+def get_sheets_session() -> Optional[AuthorizedSession]:
+    """Return an AuthorizedSession for Sheets API using OAuth token."""
+    if not TOKEN_PATH.exists():
+        return None
+    creds = Credentials.from_authorized_user_file(str(TOKEN_PATH))
+    if not creds.valid:
+        creds.refresh(Request())
+    return AuthorizedSession(creds)
+
+
+SHEETS_BASE = "https://sheets.googleapis.com/v4/spreadsheets"
+
+
+class SheetsError(Exception):
+    pass
+
+
+def _sheets_get(session: AuthorizedSession, spreadsheet_id: str, range_: str) -> list:
+    """GET a range from Sheets. Returns rows list or []."""
+    from urllib.parse import quote
+    url = f"{SHEETS_BASE}/{spreadsheet_id}/values/{quote(range_, safe='')}"
+    r = session.get(url)
+    if r.status_code != 200:
+        raise SheetsError(f"{r.status_code} {r.text[:200]}")
+    return r.json().get("values", [])
+
+
+def _sheets_batch_update(session: AuthorizedSession, spreadsheet_id: str, data: list):
+    """Batch update ranges in Sheets."""
+    url = f"{SHEETS_BASE}/{spreadsheet_id}/values:batchUpdate"
+    body = {"valueInputOption": "USER_ENTERED", "data": data}
+    r = session.post(url, json=body)
+    if r.status_code != 200:
+        raise SheetsError(f"{r.status_code} {r.text[:200]}")
+
+
+def _sheets_update(session: AuthorizedSession, spreadsheet_id: str, range_: str, values: list):
+    """Update a single range in Sheets."""
+    from urllib.parse import quote
+    url = f"{SHEETS_BASE}/{spreadsheet_id}/values/{quote(range_, safe='!:')}?valueInputOption=USER_ENTERED"
+    r = session.put(url, json={"values": values})
+    if r.status_code != 200:
+        raise SheetsError(f"{r.status_code} {r.text[:200]}")
 
 
 # ---------------------------------------------------------------------------
@@ -203,9 +269,9 @@ def build_template_vars(lead: dict, config: dict, env: dict) -> dict:
     outreach_cfg = config.get("outreach", {})
     return {
         "business_name": lead.get("business_name", ""),
-        "contact_name": lead.get("contact_name", "") or lead.get("business_name", ""),
+        "contact_name": lead.get("contact_name", "") or "Anh/Chị",
         "platform": lead.get("platform", "").replace("_", " ").title() or "Shopee/TikTok Shop",
-        "monthly_orders": lead.get("monthly_orders", "500") or "500",
+        "monthly_orders": lead.get("monthly_orders", "500+") or "500+",
         "sender_name": env.get("SENDER_NAME") or outreach_cfg.get("sender_name", ""),
         "sender_email": env.get("SENDER_EMAIL") or outreach_cfg.get("sender_email", ""),
         "sender_zalo": env.get("SENDER_ZALO", ""),
@@ -227,9 +293,9 @@ def create_message(to: str, subject: str, body: str, sender: str) -> dict:
     text_part = MIMEText(body, "plain", "utf-8")
     message.attach(text_part)
 
-    # Simple HTML version (preserve line breaks)
-    html_body = "<br>".join(body.split("\n"))
-    html_part = MIMEText(f"<html><body>{html_body}</body></html>", "html", "utf-8")
+    # HTML version with markdown rendering
+    html_body = md_lib.markdown(body, extensions=["nl2br"])
+    html_part = MIMEText(f"<html><body style='font-family:sans-serif;font-size:15px;line-height:1.6;max-width:600px;margin:auto;padding:20px;color:#222;'>{html_body}</body></html>", "html", "utf-8")
     message.attach(html_part)
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -260,16 +326,7 @@ def get_outreach_status(sheets_service, spreadsheet_id: str, business_name: str)
         return {}
 
     try:
-        result = (
-            sheets_service.spreadsheets()
-            .values()
-            .get(
-                spreadsheetId=spreadsheet_id,
-                range="'Outreach Tracker'!A:K",
-            )
-            .execute()
-        )
-        rows = result.get("values", [])
+        rows = _sheets_get(sheets_service, spreadsheet_id, "Outreach Tracker!A:K")
         if len(rows) < 2:
             return {}
 
@@ -278,7 +335,7 @@ def get_outreach_status(sheets_service, spreadsheet_id: str, business_name: str)
             row_dict = dict(zip(headers, row + [""] * (len(headers) - len(row))))
             if row_dict.get("Business Name", "").strip().lower() == business_name.strip().lower():
                 return row_dict
-    except HttpError as e:
+    except SheetsError as e:
         logger.warning(f"CRM lookup failed: {e}")
 
     return {}
@@ -303,30 +360,17 @@ def update_crm_outreach(
     sent_col, date_col = col_map.get(sequence_num, ("B", "C"))
 
     try:
-        # Find the row
-        result = (
-            sheets_service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range="'Outreach Tracker'!A:A")
-            .execute()
-        )
-        names = [r[0] if r else "" for r in result.get("values", [])]
+        names = [r[0] if r else "" for r in _sheets_get(sheets_service, spreadsheet_id, "Outreach Tracker!A:A")]
         for i, name in enumerate(names):
             if name.strip().lower() == business_name.strip().lower():
                 row_num = i + 1
-                sheets_service.spreadsheets().values().batchUpdate(
-                    spreadsheetId=spreadsheet_id,
-                    body={
-                        "valueInputOption": "USER_ENTERED",
-                        "data": [
-                            {"range": f"'Outreach Tracker'!{sent_col}{row_num}", "values": [["Yes"]]},
-                            {"range": f"'Outreach Tracker'!{date_col}{row_num}", "values": [[sent_date]]},
-                        ],
-                    },
-                ).execute()
+                _sheets_batch_update(sheets_service, spreadsheet_id, [
+                    {"range": f"Outreach Tracker!{sent_col}{row_num}", "values": [["Yes"]]},
+                    {"range": f"Outreach Tracker!{date_col}{row_num}", "values": [[sent_date]]},
+                ])
                 logger.debug(f"CRM updated: {business_name} email {sequence_num}")
                 return
-    except HttpError as e:
+    except SheetsError as e:
         logger.warning(f"CRM update failed: {e}")
 
 
@@ -335,24 +379,13 @@ def update_lead_status(sheets_service, spreadsheet_id: str, business_name: str, 
     if not sheets_service or not spreadsheet_id:
         return
     try:
-        result = (
-            sheets_service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range="'Leads'!A:A")
-            .execute()
-        )
-        names = [r[0] if r else "" for r in result.get("values", [])]
+        names = [r[0] if r else "" for r in _sheets_get(sheets_service, spreadsheet_id, "Leads!A:A")]
         for i, name in enumerate(names):
             if name.strip().lower() == business_name.strip().lower():
                 row_num = i + 1
-                sheets_service.spreadsheets().values().update(
-                    spreadsheetId=spreadsheet_id,
-                    range=f"'Leads'!J{row_num}",
-                    valueInputOption="USER_ENTERED",
-                    body={"values": [[status]]},
-                ).execute()
+                _sheets_update(sheets_service, spreadsheet_id, f"Leads!J{row_num}", [[status]])
                 return
-    except HttpError as e:
+    except SheetsError as e:
         logger.warning(f"Lead status update failed: {e}")
 
 
@@ -360,7 +393,7 @@ def update_lead_status(sheets_service, spreadsheet_id: str, business_name: str, 
 # Sequence logic
 # ---------------------------------------------------------------------------
 
-def determine_next_email(crm_row: dict, sent_date_override: Optional[str] = None) -> Optional[int]:
+def determine_next_email(crm_row: dict) -> Optional[int]:
     """
     Given a CRM outreach row, determine which email to send next.
     Returns 1, 2, 3, or None (if sequence is complete or should stop).
@@ -512,7 +545,7 @@ def main():
     sheets_service = None
     if not args.dry_run:
         gmail_service = get_gmail_service()
-        sheets_service = get_sheets_service()
+        sheets_service = get_sheets_session()
 
     # Build leads list
     leads = []
@@ -525,14 +558,15 @@ def main():
             "monthly_orders": "500",
         }]
     elif args.input:
-        path = Path(args.input)
-        if not path.exists():
-            logger.error(f"Input file not found: {args.input}")
+        try:
+            path = validate_input_path(args.input)
+            with open(path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                leads = list(reader)
+            logger.info(f"Loaded {len(leads)} leads from {path}")
+        except (ValueError, FileNotFoundError) as e:
+            logger.error(str(e))
             sys.exit(1)
-        with open(path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            leads = list(reader)
-        logger.info(f"Loaded {len(leads)} leads from {args.input}")
     else:
         parser.error("Provide --input or --to")
 
