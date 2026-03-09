@@ -52,7 +52,7 @@ outreach:
   sequence_days: [1, 4, 10]
   follow_up_count: 3
   sender_name: ""  # fill in your name
-  sender_email: ""  # fill in your Gmail address
+  sender_email: "hohuyblon@gmail.com"
 
 crm:
   type: google_sheets
