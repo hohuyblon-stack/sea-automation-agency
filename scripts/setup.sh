@@ -106,17 +106,26 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Check credentials.json
+# 6. Check credentials.json and set up Google auth
 # ---------------------------------------------------------------------------
+# NOTE: gcloud CLI is NOT required. Authentication is handled directly
+# via OAuth2 using credentials.json from Google Cloud Console.
 if [ -f "credentials.json" ]; then
     log "credentials.json found."
+    log "Running Google API auth setup..."
+    $PYTHON scripts/auth_setup.py || warn "Auth setup had issues — see above."
 else
     warn "credentials.json not found!"
-    echo "  To set up Google APIs:"
+    echo ""
+    echo "  To set up Google APIs (no gcloud CLI needed):"
     echo "  1. Go to: https://console.cloud.google.com"
-    echo "  2. Enable Gmail API and Google Sheets API"
-    echo "  3. Create OAuth 2.0 credentials (Desktop App)"
-    echo "  4. Download as credentials.json and place in: $(pwd)"
+    echo "  2. Create a project (or select an existing one)"
+    echo "  3. Enable these APIs: Gmail API, Google Sheets API, Google Drive API"
+    echo "  4. Go to 'Credentials' > 'Create Credentials' > 'OAuth 2.0 Client ID'"
+    echo "  5. Choose 'Desktop app' as application type"
+    echo "  6. Download as credentials.json and place in: $(pwd)"
+    echo ""
+    echo "  Then run: python scripts/auth_setup.py"
 fi
 
 # ---------------------------------------------------------------------------
@@ -132,11 +141,13 @@ echo -e "${GREEN}=== Setup Complete! ===${NC}"
 echo ""
 echo "Next steps:"
 echo "  1. Edit .env with your credentials"
-echo "  2. Place credentials.json in this directory"
+echo "  2. Place credentials.json in this directory (from Google Cloud Console)"
 echo "  3. Edit config.yaml: set sender_name and sender_email"
+echo "  4. Run: python scripts/auth_setup.py            # Set up Google auth (no gcloud needed)"
 echo ""
 echo "Then run:"
 echo "  source venv/bin/activate"
+echo "  python scripts/auth_setup.py --test              # Verify Google API access"
 echo "  python crm/setup_crm.py                         # Create Google Sheets CRM"
 echo "  python leads/scrapers/google_maps_leads.py --category 'shop thoi trang' --city 'Ho Chi Minh' --count 30"
 echo "  python leads/qualify_leads.py --input leads/data/<file>.csv"

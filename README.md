@@ -59,13 +59,33 @@ cp .env.example .env
 # Edit config.yaml: fill in sender_name and sender_email
 ```
 
-### 3. Set Up Gmail API
+### 3. Set Up Google API Auth (no gcloud CLI needed)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Enable Gmail API and Google Sheets API
-3. Create OAuth 2.0 credentials, download as `credentials.json`
-4. Place `credentials.json` in the project root
-5. Run any script that uses Gmail — it will open a browser for auth and save `token.json`
+2. Create a project (or select an existing one)
+3. Enable these APIs: **Gmail API**, **Google Sheets API**, **Google Drive API**
+4. Go to **Credentials** > **Create Credentials** > **OAuth 2.0 Client ID**
+5. Choose **Desktop app** as the application type
+6. Download the JSON file and save it as `credentials.json` in the project root
+7. Run the auth setup script:
+
+```bash
+python scripts/auth_setup.py
+```
+
+This opens a browser window for Google sign-in and saves your token locally. No `gcloud` CLI or external tools required.
+
+To verify everything works:
+
+```bash
+python scripts/auth_setup.py --test
+```
+
+To re-authenticate (e.g., after changing scopes):
+
+```bash
+python scripts/auth_setup.py --reauth
+```
 
 ### 4. Find Your First Leads
 
