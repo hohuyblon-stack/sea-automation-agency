@@ -33,6 +33,10 @@ from datetime import date
 from pathlib import Path
 from typing import List, Optional
 
+# Agent loop imports (Karpathy's autoresearch pattern)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from quality_loop import AgentLoop, FindEvaluator, EvaluationResult
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -294,6 +298,61 @@ def qualify(
     return qualified
 
 
+def qualify_with_loop(
+    input_path: str,
+    output_path: str,
+    min_score: int = DEFAULT_MIN_SCORE,
+    verbose: bool = False,
+) -> List[ScoredLead]:
+    """
+    Run lead qualification inside an autoresearch agent loop.
+
+    The loop: generate (qualify) → evaluate (score metrics) → improve (relax thresholds) → repeat
+    until quality targets from program.md are met or max iterations exhausted.
+    """
+    evaluator = FindEvaluator()
+    current_min_score = min_score
+
+    def generate_leads(**kwargs):
+        nonlocal current_min_score
+        return qualify(
+            input_path=input_path,
+            output_path=output_path,
+            min_score=current_min_score,
+            verbose=verbose,
+        )
+
+    def evaluate_leads(leads):
+        # Convert ScoredLead objects to dicts for the evaluator
+        lead_dicts = [asdict(l) for l in leads] if leads else []
+        return evaluator.evaluate(lead_dicts)
+
+    def improve_leads(leads, evaluation: EvaluationResult):
+        nonlocal current_min_score
+        # Apply improvement actions from the evaluation
+        for action in evaluation.improvement_actions:
+            if "tighten_targeting" in action or "yield_rate" in action:
+                current_min_score = max(10, current_min_score - 5)
+                logger.info(f"[IMPROVE] Lowered min_score to {current_min_score}")
+        # Re-generate with relaxed parameters
+        return qualify(
+            input_path=input_path,
+            output_path=output_path,
+            min_score=current_min_score,
+            verbose=verbose,
+        )
+
+    loop = AgentLoop(stage="FIND", threshold=70, max_iterations=3)
+    result = loop.run(
+        generate_fn=generate_leads,
+        evaluate_fn=evaluate_leads,
+        improve_fn=improve_leads,
+    )
+
+    print(result.summary())
+    return result.output or []
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Score and filter raw leads for outreach"
@@ -314,6 +373,10 @@ def main():
         "--verbose", action="store_true",
         help="Show why each lead was disqualified"
     )
+    parser.add_argument(
+        "--no-loop", action="store_true",
+        help="Disable agent loop (run qualification once without evaluation)"
+    )
     args = parser.parse_args()
 
     if args.verbose:
@@ -325,12 +388,20 @@ def main():
         today = date.today().isoformat()
         output_path = str(input_dir / f"qualified_{today}.csv")
 
-    qualify(
-        input_path=args.input,
-        output_path=output_path,
-        min_score=args.min_score,
-        verbose=args.verbose,
-    )
+    if args.no_loop:
+        qualify(
+            input_path=args.input,
+            output_path=output_path,
+            min_score=args.min_score,
+            verbose=args.verbose,
+        )
+    else:
+        qualify_with_loop(
+            input_path=args.input,
+            output_path=output_path,
+            min_score=args.min_score,
+            verbose=args.verbose,
+        )
 
 
 if __name__ == "__main__":

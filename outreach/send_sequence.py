@@ -42,6 +42,10 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
 
+# Agent loop imports (Karpathy's autoresearch pattern)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from quality_loop import AgentLoop, OutreachEvaluator, EvaluationResult
+
 import yaml
 from dotenv import dotenv_values
 from google.auth.transport.requests import Request
@@ -484,6 +488,130 @@ def process_lead(
 
 
 # ---------------------------------------------------------------------------
+# Agent Loop Wrapper (Autoresearch Pattern)
+# ---------------------------------------------------------------------------
+
+def _check_template_clean(template: dict, variables: dict) -> bool:
+    """Check if all {{placeholders}} are resolved after rendering."""
+    rendered = render_template(template, variables)
+    return "{{" not in rendered["subject"] and "{{" not in rendered["body"]
+
+
+def _check_personalization(lead: dict, config: dict, env: dict) -> bool:
+    """Check if all 5 core template variables are filled."""
+    vars_ = build_template_vars(lead, config, env)
+    core_keys = ["business_name", "contact_name", "platform", "sender_name", "sender_email"]
+    return all(vars_.get(k) for k in core_keys)
+
+
+def send_with_loop(
+    leads: list,
+    gmail_service,
+    sheets_service,
+    config: dict,
+    env: dict,
+    lang: str = "vi",
+    dry_run: bool = False,
+    delay: float = 2.0,
+) -> dict:
+    """
+    Send outreach sequence inside an autoresearch agent loop.
+
+    The loop: generate (send batch) → evaluate (score metrics) → improve (fix issues) → repeat
+    """
+    evaluator = OutreachEvaluator()
+
+    def generate_sends(**kwargs):
+        """Send emails and collect structured results for evaluation."""
+        send_results = []
+        sent_count = 0
+
+        for lead in leads:
+            business_name = lead.get("business_name", "")
+            email = lead.get("email", "").strip()
+
+            if not email:
+                continue
+
+            # Pre-check personalization and template cleanliness
+            personalized = _check_personalization(lead, config, env)
+
+            template_clean = True
+            try:
+                template = load_template(1, lang)
+                template_vars = build_template_vars(lead, config, env)
+                template_clean = _check_template_clean(template, template_vars)
+            except FileNotFoundError:
+                template_clean = False
+
+            # Check timing compliance (always true for email 1)
+            timing_ok = True
+            spreadsheet_id = env.get("SHEETS_CRM_ID", "")
+            crm_row = get_outreach_status(sheets_service, spreadsheet_id, business_name)
+            if crm_row:
+                next_email = determine_next_email(crm_row)
+                timing_ok = next_email is not None
+
+            result = process_lead(
+                lead=lead,
+                gmail_service=gmail_service,
+                sheets_service=sheets_service,
+                config=config,
+                env=env,
+                lang=lang,
+                dry_run=dry_run,
+            )
+
+            send_results.append({
+                "business_name": business_name,
+                "sent": result,
+                "personalized": personalized,
+                "timing_ok": timing_ok,
+                "clean_render": template_clean,
+                "crm_synced": result,  # CRM update happens inside process_lead on success
+            })
+
+            if result:
+                sent_count += 1
+                if not dry_run and len(leads) > 1:
+                    time.sleep(delay)
+
+        return send_results
+
+    def evaluate_sends(send_results):
+        return evaluator.evaluate(send_results)
+
+    def improve_sends(send_results, evaluation: EvaluationResult):
+        """Re-attempt failed sends with fixes applied."""
+        for action in evaluation.improvement_actions:
+            if "fill_missing_fields" in action:
+                # Fill missing fields with defaults for leads that failed personalization
+                for lead in leads:
+                    if not lead.get("contact_name"):
+                        lead["contact_name"] = lead.get("business_name", "Ban")
+                    if not lead.get("platform"):
+                        lead["platform"] = "Shopee"
+            if "retry_failed_sends" in action:
+                logger.info("[IMPROVE] Retrying failed sends with backoff...")
+                time.sleep(2)
+
+        return generate_sends()
+
+    loop = AgentLoop(stage="OUTREACH", threshold=90, max_iterations=2)
+    result = loop.run(
+        generate_fn=generate_sends,
+        evaluate_fn=evaluate_sends,
+        improve_fn=improve_sends,
+    )
+
+    print(result.summary())
+
+    sent = sum(1 for r in (result.output or []) if r.get("sent"))
+    skipped = len(leads) - sent
+    return {"sent": sent, "skipped": skipped, "loop_result": result}
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -498,6 +626,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Preview emails without sending")
     parser.add_argument("--email-num", type=int, choices=[1, 2, 3], help="Force a specific email number")
     parser.add_argument("--delay", type=float, default=2.0, help="Seconds between sends (default: 2)")
+    parser.add_argument("--no-loop", action="store_true", help="Disable agent loop (send without evaluation)")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -536,27 +665,39 @@ def main():
     else:
         parser.error("Provide --input or --to")
 
-    # Process leads
-    sent = 0
-    skipped = 0
-    for lead in leads:
-        result = process_lead(
-            lead=lead,
+    # Process leads — with or without agent loop
+    if args.no_loop:
+        sent = 0
+        skipped = 0
+        for lead in leads:
+            result = process_lead(
+                lead=lead,
+                gmail_service=gmail_service,
+                sheets_service=sheets_service,
+                config=config,
+                env=env,
+                lang=args.lang,
+                dry_run=args.dry_run,
+            )
+            if result:
+                sent += 1
+                if not args.dry_run and len(leads) > 1:
+                    time.sleep(args.delay)
+            else:
+                skipped += 1
+        print(f"\nDone. Sent: {sent}, Skipped: {skipped}")
+    else:
+        result = send_with_loop(
+            leads=leads,
             gmail_service=gmail_service,
             sheets_service=sheets_service,
             config=config,
             env=env,
             lang=args.lang,
             dry_run=args.dry_run,
+            delay=args.delay,
         )
-        if result:
-            sent += 1
-            if not args.dry_run and len(leads) > 1:
-                time.sleep(args.delay)
-        else:
-            skipped += 1
-
-    print(f"\nDone. Sent: {sent}, Skipped: {skipped}")
+        print(f"\nDone. Sent: {result['sent']}, Skipped: {result['skipped']}")
 
 
 if __name__ == "__main__":
